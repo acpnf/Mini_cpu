@@ -1,0 +1,49 @@
+module memoria (
+    input  wire        clk,     // Clock do sistema
+    input  wire        reset,   // Sinal de reset (ativo em alto)
+    input  wire        we,      // Write Enable (1 = escrita)
+    input  wire [3:0]  addr,    // Endereço (4 bits = 16 registradores)
+    input  wire [15:0] data,    // Dado de entrada (16 bits)
+    output wire [15:0] q        // Dado de saída (16 bits)
+);
+
+    // Banco de registradores 16x16 bits
+    reg [15:0] ram [15:0];
+    
+    // Registrador para armazenar o endereço de leitura
+    reg [3:0] addr_reg;
+
+    // Inicialização e operação síncrona
+    always @(posedge clk) begin
+        // Reset síncrono (zera todos os registradores)
+        if (reset) begin
+            ram[0]  <= 16'h0000;
+            ram[1]  <= 16'h0000;
+            ram[2]  <= 16'h0000;
+            ram[3]  <= 16'h0000;
+            ram[4]  <= 16'h0000;
+            ram[5]  <= 16'h0000;
+            ram[6]  <= 16'h0000;
+            ram[7]  <= 16'h0000;
+            ram[8]  <= 16'h0000;
+            ram[9]  <= 16'h0000;
+            ram[10] <= 16'h0000;
+            ram[11] <= 16'h0000;
+            ram[12] <= 16'h0000;
+            ram[13] <= 16'h0000;
+            ram[14] <= 16'h0000;
+            ram[15] <= 16'h0000;
+        end 
+        // Operação de escrita
+        else if (we) begin
+            ram[addr] <= data;
+        end
+        
+        // Atualiza endereço de leitura
+        addr_reg <= addr;
+    end
+
+    // Leitura assíncrona
+    assign q = ram[addr_reg];
+
+endmodule
