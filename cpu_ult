@@ -1,0 +1,76 @@
+module cpu (
+    
+    input  wire        clk,     // Clock do sistema
+    input  wire        enviar, // botao para enviar
+    input  wire        ligar,
+    input  wire [17:0] entrada,
+	 
+	 // Imediato
+    output reg [15:0] saida 
+    //falta a saída do endereço
+
+);
+
+wire [2:0] opcode = entrada[17:15];
+wire [3:0] D1 = entrada[14:11];
+wire [3:0] r2 = entrada[10:7];
+wire [3:0] r3 = entrada[6:3];
+wire [6:0] imediato = entrada[6:0];
+
+wire flag_ram; //flag puxada da memoria ram
+
+wire [15:0] resultado;
+
+parameter INIT = 0, PRESS_LIG=1, ON=2, PRESS = 3, PROCESSAR = 4, SHOW =5;
+
+reg [2:0] state = 0;
+
+always @(posedge clk) begin
+    case(state)
+
+    INIT: begin
+        if (!ligar) state <= PRESS_LIG;
+    end
+
+	 
+    PRESS_LIG: begin
+        if (!ligar) state <= PRESS_LIG;
+        if (ligar) state <= ON;
+    end    
+    
+    ON: begin
+        if (!enviar) state <= PRESS;
+        if (!ligar) state <= INIT;
+    end
+    PRESS: begin
+        if (!enviar) state <= PRESS;    
+        if (enviar) state <= PROCESSAR;
+    end
+    PROCESSAR: begin
+        if (flag_ram) state <= SHOW;
+        if (!flag_ram) state <= PROCESSAR; 
+    end
+    SHOW: begin
+        saida <= resultado;
+        if (enviar) state <=SHOW;
+        if (!enviar) state <= PRESS;
+    end
+
+    endcase
+end   
+
+memoria memory(
+    .flag_ram(flag_ram),
+    .clk(clk),
+    .opcode(opcode),
+    .r2(dado_R2),
+    .r3(dado_R3),
+    .imediato(imediato),
+    .saida(resultado),
+    
+);
+
+// compartilhados: enviar, clk, opcode, r2, D1, entrada, flag_geral
+// recebidos: resultado, flag_ram
+
+endmodule
