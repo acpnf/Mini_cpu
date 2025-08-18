@@ -1,0 +1,55 @@
+module cpu (
+    input  wire        clk,
+    input  wire        enviar,
+    input  wire        ligar,        // usado como "clear" da saída
+    input  wire [17:0] entrada,      // [17:15]=opcode, [14:11]=D1, [10:7]=r2, [6:3]=r3, [6:0]=imediato
+    output reg  [15:0] saida,
+    output reg         negativo      // indica se o número é negativo
+);
+
+    // Decodificação
+    wire [2:0] opcode   = entrada[17:15];
+    wire [3:0] D1       = entrada[14:11];
+    wire [3:0] r2       = entrada[10:7];
+    wire [3:0] r3       = entrada[6:3];
+    wire [6:0] imediato = entrada[6:0];
+
+    wire        flag_ram;
+    wire [15:0] resultado;
+    wire        resultado_neg;
+
+    // Função de conversão: complemento de dois -> sinal+magnitude (16 bits)
+    function [15:0] to_signmag(input signed [15:0] val);
+        if (val < 0)
+            to_signmag = {1'b1, -val[14:0]}; // bit 15 = sinal, magnitude absoluta em 15 bits
+        else
+            to_signmag = {1'b0, val[14:0]};  // bit 15 = 0, magnitude em 15 bits
+    endfunction
+
+    // Latch simples da saída quando a memória confirmar
+    always @(posedge clk) begin
+        if (!ligar) begin
+            saida    <= 16'h0000;
+            negativo <= 1'b0;
+        end
+        else if (flag_ram) begin
+            saida    <= to_signmag(resultado);   // conversão só na saída pros LEDs
+            negativo <= resultado_neg;           // negativo fornecido pela memória
+        end
+    end
+
+    // Instancia memória
+    memoria u_mem (
+        .opcode(opcode),
+        .clk(clk),
+        .enviar(enviar),
+        .r2(r2),
+        .r3(r3),
+        .D1(D1),
+        .imediato(imediato),
+        .flag_ram(flag_ram),
+        .saida(resultado),
+        .negativo(resultado_neg)
+    );
+
+endmodule
