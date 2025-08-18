@@ -16,12 +16,20 @@ module cpu (
     wire        flag_ram;
     wire [15:0] resultado;
 
+    // Função de conversão: complemento de dois -> sinal+magnitude
+    function [15:0] to_signmag(input signed [15:0] val);
+        if (val < 0)
+            to_signmag = {1'b1, 9'b0, -val[6:0]}; // sinal=1, magnitude em 7 bits
+        else
+            to_signmag = {1'b0, 9'b0, val[6:0]};  // sinal=0, magnitude em 7 bits
+    endfunction
+
     // Latch simples da saída quando a memória confirmar
     always @(posedge clk) begin
         if (!ligar)
             saida <= 16'h0000;
         else if (flag_ram)
-            saida <= resultado;
+            saida <= to_signmag(resultado); // conversão só na saída pros LEDs
     end
 
     memoria u_mem (
@@ -84,7 +92,6 @@ module memoria (
         .result(alu_out)
     );
 
-
     always @(posedge clk) begin
         case (st)
             IDLE: begin
@@ -92,22 +99,22 @@ module memoria (
 
                 // Reset do banco (opcode 110) somente quando der start
                 if (start && opcode == 3'b110) begin
-							  ram[0]  <= 16'h0000;
-								ram[1]  <= 16'h0000;
-								ram[2]  <= 16'h0000;
-								ram[3]  <= 16'h0000;
-								ram[4]  <= 16'h0000;
-								ram[5]  <= 16'h0000;
-								ram[6]  <= 16'h0000;
-								ram[7]  <= 16'h0000;
-								ram[8]  <= 16'h0000;
-								ram[9]  <= 16'h0000;
-								ram[10] <= 16'h0000;
-								ram[11] <= 16'h0000;
-								ram[12] <= 16'h0000;
-								ram[13] <= 16'h0000;
-								ram[14] <= 16'h0000;
-								ram[15] <= 16'h0000;
+                    ram[0]  <= 16'h0000;
+                    ram[1]  <= 16'h0000;
+                    ram[2]  <= 16'h0000;
+                    ram[3]  <= 16'h0000;
+                    ram[4]  <= 16'h0000;
+                    ram[5]  <= 16'h0000;
+                    ram[6]  <= 16'h0000;
+                    ram[7]  <= 16'h0000;
+                    ram[8]  <= 16'h0000;
+                    ram[9]  <= 16'h0000;
+                    ram[10] <= 16'h0000;
+                    ram[11] <= 16'h0000;
+                    ram[12] <= 16'h0000;
+                    ram[13] <= 16'h0000;
+                    ram[14] <= 16'h0000;
+                    ram[15] <= 16'h0000;
                     saida   <= 16'h0000;
                     flag_ram<= 1'b1; // confirma reset
                 end
@@ -140,6 +147,7 @@ module memoria (
     end
 
 endmodule
+
 ///////////////////////////////////////////////////////
 
 module operacoes (
@@ -157,10 +165,12 @@ module operacoes (
                subi = 3'b100,
                mul  = 3'b101;
 
-    // Extensão de sinal do imediato (7 -> 16)
-    wire signed [15:0] imm = {{9{imediato[6]}}, imediato};
+    // Converte imediato de sinal+magnitude (7 bits) -> complemento de dois (16 bits)
+    wire signed [15:0] imm = (imediato[6]) ?
+                             -$signed({10'b0, imediato[5:0]}) : // negativo
+                              $signed({10'b0, imediato[5:0]}); // positivo
 
-    // Versões com sinal
+    // Versões com sinal (complemento de dois) dos registradores
     wire signed [15:0] r2s = $signed(r2);
     wire signed [15:0] r3s = $signed(r3);
 
