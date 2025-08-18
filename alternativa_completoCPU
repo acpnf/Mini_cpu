@@ -16,12 +16,12 @@ module cpu (
     wire        flag_ram;
     wire [15:0] resultado;
 
-    // Função de conversão: complemento de dois -> sinal+magnitude
+    // Função de conversão: complemento de dois -> sinal+magnitude (16 bits)
     function [15:0] to_signmag(input signed [15:0] val);
         if (val < 0)
-            to_signmag = {1'b1, 9'b0, -val[6:0]}; // sinal=1, magnitude em 7 bits
+            to_signmag = {1'b1, -val[14:0]}; // bit 15 = sinal, magnitude absoluta em 15 bits
         else
-            to_signmag = {1'b0, 9'b0, val[6:0]};  // sinal=0, magnitude em 7 bits
+            to_signmag = {1'b0, val[14:0]};  // bit 15 = 0, magnitude em 15 bits
     endfunction
 
     // Latch simples da saída quando a memória confirmar
