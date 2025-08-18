@@ -2,8 +2,9 @@ module cpu (
     input  wire        clk,
     input  wire        enviar,
     input  wire        ligar,        // usado como "clear" da saída
-    input  wire [17:0] entrada,      // [17:15]=opcode, [14:11]=D1, [10:7]=r2, [6:3]=r3, [6:0]=imediato
-    output reg  [15:0] saida
+    input  wire [17:0] entrada,      // [17:15]=opcode, [14:11]=D1, [10:7]=r2, [6:0]=imediato
+    output reg  [15:0] saida,        // saída em sinal+magnitude
+    output wire        neg_flag      // LED indicador de número negativo
 );
 
     // Decodificação
@@ -18,10 +19,16 @@ module cpu (
 
     // Função de conversão: complemento de dois -> sinal+magnitude (16 bits)
     function [15:0] to_signmag(input signed [15:0] val);
-        if (val < 0)
-            to_signmag = {1'b1, -val[14:0]}; // bit 15 = sinal, magnitude absoluta em 15 bits
-        else
-            to_signmag = {1'b0, val[14:0]};  // bit 15 = 0, magnitude em 15 bits
+        reg [15:0] mag;
+        begin
+            if (val < 0) begin
+                mag = -val;                // magnitude absoluta
+                to_signmag = {1'b1, mag[14:0]}; // bit 15 = sinal
+            end
+            else begin
+                to_signmag = {1'b0, val[14:0]};
+            end
+        end
     endfunction
 
     // Latch simples da saída quando a memória confirmar
@@ -29,9 +36,13 @@ module cpu (
         if (!ligar)
             saida <= 16'h0000;
         else if (flag_ram)
-            saida <= to_signmag(resultado); // conversão só na saída pros LEDs
+            saida <= to_signmag(resultado); // conversão para sinal+magnitude
     end
 
+    // LED extra para indicar número negativo
+    assign neg_flag = saida[15];
+
+    // Instancia memória
     memoria u_mem (
         .opcode(opcode),
         .clk(clk),
@@ -44,145 +55,4 @@ module cpu (
         .saida(resultado)
     );
 
-endmodule
-
-///////////////////////////////////////////////////////
-
-module memoria (
-    input  wire [2:0] opcode,
-    input  wire       clk,
-    input  wire       enviar,      // pulso de start (detectamos a borda)
-    input  wire [3:0] r2,
-    input  wire [3:0] r3,
-    input  wire [3:0] D1,
-    input  wire [6:0] imediato,
-
-    output reg        flag_ram,    // 1 ciclo quando terminar
-    output reg [15:0] saida
-);
-
-    // Memória de 16 x 16
-    reg [15:0] ram [0:15];
-
-    // Edge detector de 'enviar'
-    reg enviar_d = 1'b0;
-    always @(posedge clk) enviar_d <= enviar;
-    wire start = enviar & ~enviar_d;
-
-    // Latches dos operandos/controle (para pipeline simples)
-    reg [2:0]  op_reg;
-    reg [3:0]  D1_reg;
-    reg [15:0] r2_val_reg, r3_val_reg;
-    reg [6:0]  imm_reg;
-    reg [15:0] result_reg;
-
-    // FSM
-    localparam IDLE = 2'd0,
-               EXEC = 2'd1,
-               WRITE= 2'd2;
-    reg [1:0] st = IDLE;
-
-    // ULA combinacional (com operandos latched)
-    wire [15:0] alu_out;
-    operacoes u_alu (
-        .opcode(op_reg),
-        .r2(r2_val_reg),
-        .r3(r3_val_reg),
-        .imediato(imm_reg),
-        .result(alu_out)
-    );
-
-    always @(posedge clk) begin
-        case (st)
-            IDLE: begin
-                flag_ram <= 1'b0;
-
-                // Reset do banco (opcode 110) somente quando der start
-                if (start && opcode == 3'b110) begin
-                    ram[0]  <= 16'h0000;
-                    ram[1]  <= 16'h0000;
-                    ram[2]  <= 16'h0000;
-                    ram[3]  <= 16'h0000;
-                    ram[4]  <= 16'h0000;
-                    ram[5]  <= 16'h0000;
-                    ram[6]  <= 16'h0000;
-                    ram[7]  <= 16'h0000;
-                    ram[8]  <= 16'h0000;
-                    ram[9]  <= 16'h0000;
-                    ram[10] <= 16'h0000;
-                    ram[11] <= 16'h0000;
-                    ram[12] <= 16'h0000;
-                    ram[13] <= 16'h0000;
-                    ram[14] <= 16'h0000;
-                    ram[15] <= 16'h0000;
-                    saida   <= 16'h0000;
-                    flag_ram<= 1'b1; // confirma reset
-                end
-                else if (start) begin
-                    // Latch de tudo e vai executar
-                    op_reg      <= opcode;
-                    D1_reg      <= D1;
-                    r2_val_reg  <= ram[r2];
-                    r3_val_reg  <= ram[r3];
-                    imm_reg     <= imediato;
-                    st          <= EXEC;
-                end
-            end
-
-            EXEC: begin
-                // Captura resultado estável da ULA
-                result_reg <= alu_out;
-                st         <= WRITE;
-            end
-
-            WRITE: begin
-                ram[D1_reg] <= result_reg;
-                saida       <= result_reg;
-                flag_ram    <= 1'b1;   // pulso de 1 ciclo
-                st          <= IDLE;
-            end
-
-            default: st <= IDLE;
-        endcase
-    end
-
-endmodule
-
-///////////////////////////////////////////////////////
-
-module operacoes (
-    input  wire [2:0]  opcode,
-    input  wire [15:0] r2,
-    input  wire [15:0] r3,
-    input  wire [6:0]  imediato,
-    output reg  [15:0] result
-);
-    // OpCodes
-    localparam load = 3'b000,
-               add  = 3'b001,
-               addi = 3'b010,
-               sub  = 3'b011,
-               subi = 3'b100,
-               mul  = 3'b101;
-
-    // Converte imediato de sinal+magnitude (7 bits) -> complemento de dois (16 bits)
-    wire signed [15:0] imm = (imediato[6]) ?
-                             -$signed({10'b0, imediato[5:0]}) : // negativo
-                              $signed({10'b0, imediato[5:0]}); // positivo
-
-    // Versões com sinal (complemento de dois) dos registradores
-    wire signed [15:0] r2s = $signed(r2);
-    wire signed [15:0] r3s = $signed(r3);
-
-    always @* begin
-        case (opcode)
-            load: result = imm;
-            add : result = r2s + r3s;
-            addi: result = r2s + imm;
-            sub : result = r2s - r3s;
-            subi: result = r2s - imm;
-            mul : result = r2s * imm;      // truncado para 16 bits
-            default: result = 16'h0000;
-        endcase
-    end
 endmodule
