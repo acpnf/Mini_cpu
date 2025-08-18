@@ -1,0 +1,36 @@
+module operacoes (
+    input  wire [2:0]  opcode,
+    input  wire [15:0] r2,
+    input  wire [15:0] r3,
+    input  wire [6:0]  imediato,
+    output reg  [15:0] result
+);
+    // OpCodes
+    localparam load = 3'b000,
+               add  = 3'b001,
+               addi = 3'b010,
+               sub  = 3'b011,
+               subi = 3'b100,
+               mul  = 3'b101;
+
+    // Converte imediato de sinal+magnitude (7 bits) -> complemento de dois (16 bits)
+    wire signed [15:0] imm = (imediato[6]) ?
+                             -$signed({10'b0, imediato[5:0]}) : // negativo
+                              $signed({10'b0, imediato[5:0]}); // positivo
+
+    // Versões com sinal (complemento de dois) dos registradores
+    wire signed [15:0] r2s = $signed(r2);
+    wire signed [15:0] r3s = $signed(r3);
+
+    always @* begin
+        case (opcode)
+            load: result = imm;
+            add : result = r2s + r3s;
+            addi: result = r2s + imm;
+            sub : result = r2s - r3s;
+            subi: result = r2s - imm;
+            mul : result = r2s * imm;      // truncado para 16 bits
+            default: result = 16'h0000;
+        endcase
+    end
+endmodule
