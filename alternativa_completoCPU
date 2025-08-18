@@ -153,7 +153,8 @@ module operacoes (
                addi = 3'b010,
                sub  = 3'b011,
                subi = 3'b100,
-               mul  = 3'b101;
+               mul  = 3'b101,
+                dlp  = 3'b111;
 
     wire signed [15:0] r2s = $signed(r2);
     wire signed [15:0] r3s = $signed(r3);
@@ -167,6 +168,7 @@ module operacoes (
             sub  : result = r2s - r3s;   // operação signed
             subi : result = r2s - imm_s; // operação signed
             mul  : result = r2s * imm_s;
+            dlp : result = r2s;
             default: result = 16'h0000;
         endcase
     end
