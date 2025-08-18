@@ -57,10 +57,10 @@ input wire [2:0] opcode,
         end
 
         WAIT: begin
-            if (enviar) begin // botao rever 
+             if (enviar) begin// botao rever 
                 if (opcode == 3'b110) estado_atual <= INIT;
                 else estado_atual <= READ;
-                end
+             end
             end
 
         READ: begin
